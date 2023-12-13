@@ -8,10 +8,8 @@ from collections import defaultdict
 from typing import Dict, List
 
 import requests
-from flask import Flask, escape, json, request
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.poolmanager import PoolManager
-from requests.packages.urllib3.util import ssl_
+from flask import Flask, json, request
+from markupsafe import escape
 
 STATUS_COLOR = defaultdict(lambda: "green")
 STATUS_COLOR["firing"] = "red"
@@ -24,22 +22,6 @@ SEVERITY_EMOJI = defaultdict(lambda: "⚠️")
 SEVERITY_EMOJI["critical"] = "💀"
 
 DEFAULT_PANEL_URL = "http://grafana.my/?orgId=1"
-
-
-class TlsAdapter(HTTPAdapter):
-
-    def __init__(self, ssl_options=0, **kwargs):
-        self.ssl_options = ssl_options
-        super(TlsAdapter, self).__init__(**kwargs)
-
-    def init_poolmanager(self, *pool_args, **pool_kwargs):
-        ctx = ssl_.create_urllib3_context(ssl.PROTOCOL_TLS)
-        ctx.options |= self.ssl_options
-        self.poolmanager = PoolManager(*pool_args, ssl_context=ctx, **pool_kwargs)
-
-session = requests.session()
-adapter = TlsAdapter(ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1)
-session.mount("https://", adapter)
 
 def format(data: Dict, override_summary: str = ""):
     alerts = data.get("alerts", None)
@@ -102,8 +84,6 @@ def format(data: Dict, override_summary: str = ""):
 
 
 app = Flask(__name__)
-
-
 @app.route("/lark_platform_alert", methods=["GET", "POST"])
 def lark_platform_alert():
     data = json.loads(request.get_data())
@@ -111,8 +91,11 @@ def lark_platform_alert():
 
     headers = {"Content-Type": "application/json"}
     # 飞书报警群 url
-    url = "https://open.feishu.cn/open-apis/bot/v2/hook/-------------"
+    url = "https://open.feishu.cn/open-apis/bot/v2/hook/------------"
     r = requests.post(url=url, headers=headers, data=json.dumps(msg))
     logging.info(f"平台报警: response={r.content}")
 
     return escape(r)
+
+if __name__ == "__main__":
+    app.run(host="127.0.0.1", port="8201", debug=False)
